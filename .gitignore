@@ -1,0 +1,13 @@
+# 编译产物（不进仓库）
+build/
+*.elf
+*.hex
+*.bin
+*.map
+
+# 其他
+*.code-workspace
+
+# 系统文件
+Thumbs.db
+Desktop.ini

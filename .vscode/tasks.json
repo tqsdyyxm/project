@@ -1,0 +1,104 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "STM32: 编译",
+      "type": "process",
+      "command": "D:\\STM32Cube\\VSCodeBundles\\cmake\\4.3.1+st.1\\bin\\cmake.exe",
+      "args": [
+        "--build",
+        "${workspaceFolder}/build/Debug"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": ["$gcc"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "STM32: 烧录 (OpenOCD + ST-LINK)",
+      "type": "process",
+      "command": "D:\\openocd\\bin\\openocd.exe",
+      "args": [
+        "-s",
+        "D:\\openocd\\share\\openocd\\scripts",
+        "-f",
+        "interface/stlink.cfg",
+        "-c",
+        "transport select hla_swd",
+        "-c",
+        "adapter speed 1000",
+        "-f",
+        "target/stm32f4x.cfg",
+        "-c",
+        // 注意：OpenOCD 的 -c 参数会把反斜杠当作转义符，
+        // 所以这里必须用相对路径（cwd 已设为工程根目录），不能写 ${workspaceFolder} 形式的 Windows 路径。
+        "program build/Debug/project.elf verify reset exit"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "STM32: 编译并烧录",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "STM32: 编译",
+        "STM32: 烧录 (OpenOCD + ST-LINK)"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "STM32: 启动 OpenOCD GDB 服务器",
+      "type": "process",
+      "command": "D:\\openocd\\bin\\openocd.exe",
+      "args": [
+        "-s",
+        "D:\\openocd\\share\\openocd\\scripts",
+        "-f",
+        "interface/stlink.cfg",
+        "-c",
+        "transport select hla_swd",
+        "-f",
+        "target/stm32f4x.cfg",
+        "-c",
+        "gdb_port 3333"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "isBackground": true,
+      "problemMatcher": {
+        "owner": "cpp",
+        "pattern": {
+          "regexp": "^Info : Listening on port 3333 for gdb connections$",
+          "file": 1,
+          "line": 2,
+          "message": 3
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "Listening on port 3333 for gdb connections",
+          "endsPattern": "."
+        }
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    }
+  ]
+}

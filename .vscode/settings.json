@@ -1,0 +1,32 @@
+{
+  // VS Code 工作区配置（本项目专用，不影响其他项目）
+  "cmake.preferredGenerators": ["Ninja"],
+  "cmake.useCMakePresets": "always",
+  "cmake.buildDirectory": "${workspaceFolder}/build/Debug",
+  "cmake.configureOnOpen": true,
+  "files.associations": {
+    "*.s": "asm"
+  },
+  "VsCodeTaskButtons.showCounter": false,
+  "VsCodeTaskButtons.tasks": [
+    {
+      "label": "$(tools) 编译",
+      "task": "STM32: 编译",
+      "alignment": "left",
+      "tooltip": "CMake + Ninja 编译，生成 project.elf/hex/bin"
+    },
+    {
+      "label": "$(cloud-download) 烧录",
+      "task": "STM32: 烧录 (OpenOCD + ST-LINK)",
+      "alignment": "left",
+      "tooltip": "先确认已编译，再用 OpenOCD + ST-LINK 烧录并复位"
+    },
+    {
+      "label": "$(rocket) 编译并烧录",
+      "task": "STM32: 编译并烧录",
+      "alignment": "left",
+      "tooltip": "编译后自动烧录"
+    }
+  ],
+  "python.analysis.stubPath": "C:\\Users\\Lenovo\\.kendryte\\k230_canmv_pylance\\3cbe98dc6a96acb7\\typings"
+}
