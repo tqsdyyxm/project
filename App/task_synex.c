@@ -38,7 +38,7 @@ void Task_Synex_Entry(void *argument)
             channels[3] = m->out_deg;        /* 通道4：输出轴角度 ° */
             channels[4] = m->target_deg;     /* 通道5：目标角度 ° */
             channels[5] = JustFloat_GetEcho(); /* 通道6：参数回显 */
-            channels[6] = (float)m->test_pass; /* 通道7：到位标志 0/1 */
+            channels[6] = (float)m->test_pass; /* 通道7：测试结果 0=测试中 1=通过 -1=失败 */
 
             JustFloat_SendFrame(channels, 7U);
         }

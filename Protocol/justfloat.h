@@ -28,7 +28,7 @@ extern "C" {
 #define JF_CH_OUT_DEG       4U   /* 输出轴累计角度（相对上电位置），单位 ° */
 #define JF_CH_TARGET_DEG    5U   /* PID 目标角度，单位 ° */
 #define JF_CH_ECHO          6U   /* 参数回显通道（收到 kp=0.1 后回发 0.1） */
-#define JF_CH_SETTLED       7U   /* 到位标志：本轮 0->90->-90 是否全部到位（0/1） */
+#define JF_CH_SETTLED       7U   /* 测试结果：0=测试中，1=通过，-1=失败 */
 
 /* 发送一帧：count 个 float 通道 + 帧尾 */
 void JustFloat_SendFrame(const float *channels, uint32_t count);
