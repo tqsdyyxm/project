@@ -23,7 +23,7 @@ extern "C" {
 
 typedef enum
 {
-    BUZZER_TONE_STARTUP = 0,   /* 启动音：4kHz 两声短音 */
+    BUZZER_TONE_STARTUP = 0,   /* 启动音：4kHz 单声 */
     BUZZER_TONE_ERROR_CMD,     /* 报错音 1：高音三短声 */
     BUZZER_TONE_ERROR_MOTOR,   /* 报错音 2：低音两长声 */
 } Buzzer_Tone_t;

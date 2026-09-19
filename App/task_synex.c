@@ -26,20 +26,21 @@ void Task_Synex_Entry(void *argument)
         /* 1) 解析串口指令（kp= / ki= / kd=） */
         Protocol_CmdParse_Poll();
 
-        /* 2) 每 20ms 发一帧 JustFloat 数据（50 Hz，固定 6 通道布局） */
+        /* 2) 每 20ms 发一帧 JustFloat 数据（50 Hz，固定 7 通道布局） */
         if ((tick % SEND_INTERVAL_TICKS) == 0U)
         {
             const Motor_State_t *m = Control_Motor_GetState();
-            float channels[6];
+            float channels[7];
 
             channels[0] = m->current_a;      /* 通道1：电流 A */
-            channels[1] = m->rotor_deg;      /* 通道2：转子机械角 ° */
+            channels[1] = m->rotor_deg;      /* 通道2：转子机械角(单圈 0~360) ° */
             channels[2] = m->rotor_rpm;      /* 通道3：转子转速 RPM */
             channels[3] = m->out_deg;        /* 通道4：输出轴角度 ° */
             channels[4] = m->target_deg;     /* 通道5：目标角度 ° */
             channels[5] = JustFloat_GetEcho(); /* 通道6：参数回显 */
+            channels[6] = (float)m->test_pass; /* 通道7：到位标志 0/1 */
 
-            JustFloat_SendFrame(channels, 6U);
+            JustFloat_SendFrame(channels, 7U);
         }
 
         /* 3) 解析失败 -> 报错音 1 */

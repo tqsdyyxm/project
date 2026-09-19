@@ -14,7 +14,8 @@ void Task_Motor_Entry(void *argument)
 {
     (void)argument;
 
-    uint8_t last_fault = 0;
+    uint8_t  last_fault = 0;
+    uint32_t tick = osKernelGetTickCount();
 
     for (;;)
     {
@@ -28,6 +29,7 @@ void Task_Motor_Entry(void *argument)
         }
         last_fault = m->fault_timeout;
 
-        osDelay(1U);
+        tick += 1U;
+        osDelayUntil(tick);   /* 稳定 1ms 周期，避免 osDelay 把执行时间累积进周期 */
     }
 }

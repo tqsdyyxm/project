@@ -29,6 +29,8 @@ void Pid_Init(Pid_t *p, float kp, float ki, float kd, float out_max, float i_max
     p->kd = kd;
     p->out_max = out_max;
     p->i_max   = i_max;
+    p->p_max   = out_max;   /* 各项默认与总输出同限幅 */
+    p->d_max   = out_max;
 
     p->err   = 0.0f;
     p->i_out = 0.0f;
@@ -65,15 +67,17 @@ float Pid_Calc(Pid_t *p, float set, float fdb)
 
     p->err = set - fdb;
 
-    /* 比例 */
+    /* 比例（带限幅） */
     p_out = p->kp * p->err;
+    p_out = clamp_sym(p_out, p->p_max);
 
     /* 积分（带限幅，防积分饱和） */
     p->i_out += p->ki * p->err * PID_DT;
     p->i_out  = clamp_sym(p->i_out, p->i_max);
 
-    /* 微分作用于反馈：fdb_last - fdb 即角速度增量 */
+    /* 微分作用于反馈：fdb_last - fdb 即角速度增量（带限幅，防噪声尖峰） */
     d_out = p->kd * (p->fdb_last - fdb) / PID_DT;
+    d_out = clamp_sym(d_out, p->d_max);
     p->fdb_last = fdb;
 
     /* 总输出限幅 */

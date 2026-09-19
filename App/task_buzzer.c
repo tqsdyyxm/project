@@ -19,8 +19,7 @@ typedef struct
 
 static const Note_t s_melody_startup[] =
 {
-    { BUZZER_RATED_FREQ_HZ, 200, 100 },     /* 4kHz 短音 */
-    { BUZZER_RATED_FREQ_HZ, 200, 0   },     /* 4kHz 短音 */
+    { BUZZER_RATED_FREQ_HZ, 300, 0   },     /* 单声提示音，严格对应题面"响一次" */
 };
 
 static const Note_t s_melody_error_cmd[] =

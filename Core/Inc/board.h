@@ -27,12 +27,23 @@ extern "C" {
 /*----------------------------- 电机 CAN 参数 -----------------------------*/
 /*
  * C620 电调 ID：上电后看电调绿灯闪烁次数（闪 N 次 = ID N）。
- * 单电机出厂默认 ID = 1。若实测 ID 不同，只改下面这个宏即可。
- *   ID 1~4 的电调监听 0x200（各占 2 字节），反馈帧 = 0x200 + ID；
- *   ID 5~8 的电调监听 0x1FF。
+ * 单电机出厂默认 ID = 1。若实测 ID 不同，只改 MOTOR_ID 即可。
+ *   ID 1~4 的电调监听 0x200（每个 ID 占 8 字节数据里的 2 字节）；
+ *   ID 5~8 的电调监听 0x1FF；
+ *   反馈帧统一为 0x200 + ID。
  */
 #define MOTOR_ID               1
-#define CAN_CTRL_STDID         0x200U
+
+#if (MOTOR_ID >= 1 && MOTOR_ID <= 4)
+  #define CAN_CTRL_STDID       0x200U
+  #define CAN_CTRL_OFFSET      ((uint32_t)(MOTOR_ID - 1) * 2U)
+#elif (MOTOR_ID >= 5 && MOTOR_ID <= 8)
+  #define CAN_CTRL_STDID       0x1FFU
+  #define CAN_CTRL_OFFSET      ((uint32_t)(MOTOR_ID - 5) * 2U)
+#else
+  #error "MOTOR_ID 必须在 1~8 之间"
+#endif
+
 #define CAN_FEEDBACK_STDID     (0x200U + (uint32_t)MOTOR_ID)
 
 /* 控制电流换算：±16384 对应电调转矩电流 ±20 A */

@@ -112,8 +112,9 @@ void BSP_Can_SendCurrent(int16_t current_raw)
         current_raw = -CURRENT_RAW_MAX;
     }
 
-    /* 本电机电流位于 DATA[2*(ID-1) : 2*(ID-1)+1]，高字节在前 */
-    offset = (uint32_t)(MOTOR_ID - 1) * 2U;
+    /* 本电机电流位于 DATA[CAN_CTRL_OFFSET : CAN_CTRL_OFFSET+1]，高字节在前。
+     * CAN_CTRL_OFFSET 由 MOTOR_ID 决定（ID 1~4 -> 0x200 帧、ID 5~8 -> 0x1FF 帧）。 */
+    offset = (uint32_t)CAN_CTRL_OFFSET;
     data[offset]     = (uint8_t)((uint16_t)current_raw >> 8);
     data[offset + 1] = (uint8_t)((uint16_t)current_raw & 0xFFU);
 
