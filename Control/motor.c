@@ -113,49 +113,7 @@ void Control_Motor_Task1ms(void)
         fresh = 1;
     }
 
-    /* 2) 目标序列状态机：回零 -> 两秒测试 -> 结果展示 -> 循环。
-     *    只有实际角度回到 0°（误差 ±MOTOR_SETTLE_BAND_DEG 持续 MOTOR_SETTLE_HOLD_MS）
-     *    后才开始两秒测试，保证每轮都真正执行 0° -> 90° -> -90°。
-     *    测试阶段按固定时间切换目标，到位检测只记录、不推迟时间节点。 */
-    switch (s_seq_state)
-    {
-        case SEQ_STATE_ZEROING:
-            s_target = 0.0f;
-            if (s_motor.feedback_ok && s_motor.settled)
-            {
-                /* 已稳定在 0°：开始本轮测试，并清除上一轮结果 */
-                s_reached_90      = 0;
-                s_reached_neg90   = 0;
-                s_motor.test_pass = 0;
-                s_seq_start = now;
-                s_seq_state = SEQ_STATE_TESTING;
-            }
-            break;
-
-        case SEQ_STATE_TESTING:
-            t_test = now - s_seq_start;
-            s_target = (t_test < MOTOR_TEST_T90_MS) ? 90.0f : -90.0f;
-            if (t_test >= MOTOR_TEST_TOTAL_MS)
-            {
-                /* 测试结束：锁存本轮结果（1 通过 / -1 失败），进入展示阶段 */
-                s_motor.test_pass = (s_reached_90 && s_reached_neg90) ? 1 : -1;
-                s_show_start = now;
-                s_seq_state  = SEQ_STATE_SHOW;
-            }
-            break;
-
-        case SEQ_STATE_SHOW:
-        default:
-            s_target = -90.0f;
-            if ((now - s_show_start) >= MOTOR_SHOW_MS)
-            {
-                s_seq_state = SEQ_STATE_ZEROING;   /* 回零，准备下一轮 */
-            }
-            break;
-    }
-    s_motor.target_deg = s_target;
-
-    /* 3) 反馈超时看门狗 */
+    /* 2) 反馈超时看门狗 */
     elapsed = now - g_feedback_tick;
     if (elapsed > MOTOR_FEEDBACK_TIMEOUT_MS)
     {
@@ -170,7 +128,7 @@ void Control_Motor_Task1ms(void)
         return;
     }
 
-    /* 4) 处理新反馈：角度累计与单位换算 */
+    /* 3) 处理新反馈：角度累计与单位换算 */
     if (fresh)
     {
         s_motor.fault_timeout = 0;
@@ -208,9 +166,11 @@ void Control_Motor_Task1ms(void)
         s_motor.feedback_ok = 1;
     }
 
-    /* 5) 到位检测：误差在 ±MOTOR_SETTLE_BAND_DEG 内持续 MOTOR_SETTLE_HOLD_MS 视为到位。
+    /* 4) 到位检测（在状态机之前执行，保证状态机拿到本周期最新的到位结果）：
+     *    误差在 ±MOTOR_SETTLE_BAND_DEG 内持续 MOTOR_SETTLE_HOLD_MS 视为到位。
      *    只记录（settled / reached 标志），不干预状态机时序；
-     *    test_pass 由状态机在测试结束时锁存，失联时由看门狗清零/置失败。 */
+     *    test_pass 由状态机在测试结束时锁存，失联时由看门狗清零/置失败。
+     *    注意：本步骤使用上一周期状态机给出的 s_target（滞后 1ms，无影响）。 */
     if (s_motor.feedback_ok)
     {
         if (s_target != s_settle_target)
@@ -243,6 +203,55 @@ void Control_Motor_Task1ms(void)
     {
         s_motor.settled = 0;
     }
+
+    /* 5) 目标序列状态机：回零 -> 两秒测试 -> 结果展示 -> 循环。
+     *    只有实际角度回到 0°（到位检测针对目标 0°、误差 ±MOTOR_SETTLE_BAND_DEG
+     *    持续 MOTOR_SETTLE_HOLD_MS）后才开始两秒测试，保证每轮都真正执行
+     *    0° -> 90° -> -90°。测试阶段按固定时间切换目标，到位检测只记录。 */
+    switch (s_seq_state)
+    {
+        case SEQ_STATE_ZEROING:
+            s_target = 0.0f;
+            if (s_motor.feedback_ok && s_motor.settled &&
+                s_settle_target == 0.0f)
+            {
+                /* 已稳定在 0°：开始本轮测试，并清除上一轮结果 */
+                s_reached_90      = 0;
+                s_reached_neg90   = 0;
+                s_motor.test_pass = 0;
+                s_seq_start = now;
+                s_seq_state = SEQ_STATE_TESTING;
+            }
+            break;
+
+        case SEQ_STATE_TESTING:
+            t_test = now - s_seq_start;
+            s_target = (t_test < MOTOR_TEST_T90_MS) ? 90.0f : -90.0f;
+            if (t_test >= MOTOR_TEST_TOTAL_MS)
+            {
+                /* 测试结束：锁存本轮结果（1 通过 / -1 失败），进入展示阶段 */
+                s_motor.test_pass = (s_reached_90 && s_reached_neg90) ? 1 : -1;
+                s_show_start = now;
+                s_seq_state  = SEQ_STATE_SHOW;
+            }
+            break;
+
+        case SEQ_STATE_SHOW:
+        default:
+            s_target = -90.0f;
+            if ((now - s_show_start) >= MOTOR_SHOW_MS)
+            {
+                /* 展示结束：同步清除针对 -90° 的旧到位状态，
+                 * 避免下一周期误判"已回零"，确保真实等待回到 0° */
+                s_target        = 0.0f;
+                s_settle_target = 0.0f;
+                s_settle_ms     = 0;
+                s_motor.settled = 0;
+                s_seq_state     = SEQ_STATE_ZEROING;   /* 回零，准备下一轮 */
+            }
+            break;
+    }
+    s_motor.target_deg = s_target;
 
     /* 6) 位置式 PID（1 kHz） */
     if (s_motor.feedback_ok)
