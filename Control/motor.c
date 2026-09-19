@@ -26,11 +26,23 @@ static int16_t  s_last_counts  = 0;
 static uint8_t  s_offset_done  = 0;
 static uint32_t s_last_fb_tick = 0;
 
+/* 目标序列状态机（回零 -> 两秒测试 -> 结果展示 -> 循环） */
+typedef enum
+{
+    SEQ_STATE_ZEROING = 0,  /* 回零：目标 0°，等实际角度到位后开始测试 */
+    SEQ_STATE_TESTING,      /* 两秒测试：0~700ms 目标 90°，700~2000ms 目标 -90° */
+    SEQ_STATE_SHOW,         /* 结果展示：保持 -90° 展示本轮结果 */
+} Seq_State_t;
+
 static float    s_target        = 0.0f;
 static float    s_settle_target = 0.0f;   /* 到位检测：当前跟踪的目标 */
 static uint32_t s_settle_ms     = 0;      /* 连续在带宽内的时长（ms） */
 static uint8_t  s_reached_90    = 0;
 static uint8_t  s_reached_neg90 = 0;
+
+static Seq_State_t s_seq_state  = SEQ_STATE_ZEROING;
+static uint32_t    s_seq_start  = 0;      /* 本轮测试起点（tick） */
+static uint32_t    s_show_start = 0;      /* 展示阶段起点（tick） */
 
 void Control_Motor_Init(void)
 {
@@ -58,6 +70,9 @@ void Control_Motor_Init(void)
     s_settle_ms     = 0;
     s_reached_90    = 0;
     s_reached_neg90 = 0;
+    s_seq_state     = SEQ_STATE_ZEROING;
+    s_seq_start     = 0;
+    s_show_start    = 0;
 }
 
 void Control_Motor_SetPid(float kp, float ki, float kd)
@@ -85,7 +100,7 @@ void Control_Motor_Task1ms(void)
     uint8_t fresh = 0;
     int16_t raw_cmd = 0;
     float   current_cmd_a;
-    uint32_t t_cycle;
+    uint32_t t_test;
 
     /* 1) 判断是否有新反馈（g_feedback_tick 只在收到新帧时变化） */
     if (g_feedback_tick != s_last_fb_tick)
@@ -98,22 +113,45 @@ void Control_Motor_Task1ms(void)
         fresh = 1;
     }
 
-    /* 2) 目标角度序列：0°->90°->-90°，整个序列在 MOTOR_SEQ_CYCLE_MS 内完成。
-     *    时间分配：0° 展示 T0 ms，0°->90° 给 T1 ms，剩余给 90°->-90°（行程更长）。
-     *    序列与电机反馈无关、始终推进：即使电机尚未接入，
-     *    上位机也能在"目标角度"通道看到方波，便于联调与演示。 */
-    t_cycle = now % MOTOR_SEQ_CYCLE_MS;
-    if (t_cycle < MOTOR_SEQ_T0_MS)
+    /* 2) 目标序列状态机：回零 -> 两秒测试 -> 结果展示 -> 循环。
+     *    只有实际角度回到 0°（误差 ±MOTOR_SETTLE_BAND_DEG 持续 MOTOR_SETTLE_HOLD_MS）
+     *    后才开始两秒测试，保证每轮都真正执行 0° -> 90° -> -90°。
+     *    测试阶段按固定时间切换目标，到位检测只记录、不推迟时间节点。 */
+    switch (s_seq_state)
     {
-        s_target = 0.0f;
-    }
-    else if (t_cycle < MOTOR_SEQ_T0_MS + MOTOR_SEQ_T1_MS)
-    {
-        s_target = 90.0f;
-    }
-    else
-    {
-        s_target = -90.0f;
+        case SEQ_STATE_ZEROING:
+            s_target = 0.0f;
+            if (s_motor.feedback_ok && s_motor.settled)
+            {
+                /* 已稳定在 0°：开始本轮测试，并清除上一轮结果 */
+                s_reached_90      = 0;
+                s_reached_neg90   = 0;
+                s_motor.test_pass = 0;
+                s_seq_start = now;
+                s_seq_state = SEQ_STATE_TESTING;
+            }
+            break;
+
+        case SEQ_STATE_TESTING:
+            t_test = now - s_seq_start;
+            s_target = (t_test < MOTOR_TEST_T90_MS) ? 90.0f : -90.0f;
+            if (t_test >= MOTOR_TEST_TOTAL_MS)
+            {
+                /* 测试结束：锁存本轮结果（1 通过 / -1 失败），进入展示阶段 */
+                s_motor.test_pass = (s_reached_90 && s_reached_neg90) ? 1 : -1;
+                s_show_start = now;
+                s_seq_state  = SEQ_STATE_SHOW;
+            }
+            break;
+
+        case SEQ_STATE_SHOW:
+        default:
+            s_target = -90.0f;
+            if ((now - s_show_start) >= MOTOR_SHOW_MS)
+            {
+                s_seq_state = SEQ_STATE_ZEROING;   /* 回零，准备下一轮 */
+            }
+            break;
     }
     s_motor.target_deg = s_target;
 
@@ -121,9 +159,12 @@ void Control_Motor_Task1ms(void)
     elapsed = now - g_feedback_tick;
     if (elapsed > MOTOR_FEEDBACK_TIMEOUT_MS)
     {
-        /* 失联：电流强制为 0 + 置故障标志（反馈恢复后自动清除）；
-         * 目标角度仍继续推进（仅用于显示，不驱动电机）。 */
+        /* 失联：电流强制为 0；测试结果不保留旧值（曾测过 -> -1 失败，
+         * 从未测过 -> 0），序列回到回零状态，反馈恢复后重新回零再测。 */
         s_motor.fault_timeout = 1;
+        s_motor.settled       = 0;
+        s_motor.test_pass     = (s_motor.feedback_ok) ? -1 : 0;
+        s_seq_state = SEQ_STATE_ZEROING;
         Pid_Reset(&s_pid);
         BSP_Can_SendCurrent(0);
         return;
@@ -168,18 +209,14 @@ void Control_Motor_Task1ms(void)
     }
 
     /* 5) 到位检测：误差在 ±MOTOR_SETTLE_BAND_DEG 内持续 MOTOR_SETTLE_HOLD_MS 视为到位。
-     *    只记录 + 上报（供 Synex 通道 7 显示），不干预控制时序。 */
+     *    只记录（settled / reached 标志），不干预状态机时序；
+     *    test_pass 由状态机在测试结束时锁存，失联时由看门狗清零/置失败。 */
     if (s_motor.feedback_ok)
     {
         if (s_target != s_settle_target)
         {
             s_settle_target = s_target;
             s_settle_ms     = 0;
-            if (s_target == 0.0f)       /* 新一轮开始：清空上一轮结果 */
-            {
-                s_reached_90    = 0;
-                s_reached_neg90 = 0;
-            }
         }
 
         if (fabsf(s_motor.out_deg - s_target) <= MOTOR_SETTLE_BAND_DEG)
@@ -201,13 +238,10 @@ void Control_Motor_Task1ms(void)
         {
             s_motor.settled = 0;
         }
-
-        s_motor.test_pass = (s_reached_90 && s_reached_neg90) ? 1 : 0;
     }
     else
     {
-        s_motor.settled   = 0;
-        s_motor.test_pass = 0;
+        s_motor.settled = 0;
     }
 
     /* 6) 位置式 PID（1 kHz） */

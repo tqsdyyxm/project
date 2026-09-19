@@ -50,8 +50,8 @@ project/
 | `Core/Inc/board.h` | `MOTOR_ID` | 1 | C620 电调 ID（上电看绿灯闪几下） |
 | `BSP/bsp_servo.h` | `SERVO_PULSE_0DEG_US / _180DEG_US` | 500/2500 | 舵机脉宽（换舵机改这里） |
 | `Control/motor.h` | `MOTOR_CURRENT_LIMIT_A` | 4.0 | 输出电流限幅（**调 PID 前别调大**） |
-| `Control/motor.h` | `MOTOR_SEQ_CYCLE_MS` | 2000 | 整个序列 0→90→-90 的完成时限（验收要求 2 秒内） |
-| `Control/motor.h` | `MOTOR_SEQ_T0_MS / T1_MS` | 100 / 700 | 0°展示 / 0°→90°用时（剩余 1200ms 给 90°→-90°） |
+| `Control/motor.h` | `MOTOR_TEST_T90_MS / TOTAL_MS` | 700 / 2000 | 测试阶段：目标 90° 时长 / 总时长（2 秒内） |
+| `Control/motor.h` | `MOTOR_SHOW_MS` | 300 | 结果展示时长（期间通道 7 持续显示本轮结果） |
 | `Control/motor.h` | `MOTOR_SETTLE_BAND_DEG / _HOLD_MS` | 5.0 / 50 | 到位判定（误差 ±5° 持续 50ms） |
 | `Control/motor.c` | `PID_DEFAULT_KP/KI/KD` | 0.5/0.1/0.02 | 初始 PID（现场用 Synex 在线调） |
 | `App/task_servo.c` | `SERVO_SPEED_DPS` | 45 | 舵机角速度 |

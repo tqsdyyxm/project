@@ -32,14 +32,14 @@ extern "C" {
 #define MOTOR_CURRENT_RAW_MAX     16384               /* C620 满量程原始值 */
 #define MOTOR_CURRENT_LIMIT_A     4.0f                /* 输出电流限幅（安全值） */
 #define MOTOR_FEEDBACK_TIMEOUT_MS 100U                /* 反馈超时时间 */
-/* 任务五验收时序：整个序列 0° -> 90° -> -90° 在 2 秒内完成，循环演示。
- * 时间分配（非均匀，长行程给更多时间）：
- *   0~100ms      目标 0°（起点展示）
- *   100~800ms    目标 90°（0°->90°，行程 90°）
- *   800~2000ms   目标 -90°（90°->-90°，行程 180°，给 1200ms） */
-#define MOTOR_SEQ_CYCLE_MS       2000U   /* 一个完整序列的时限（2 秒） */
-#define MOTOR_SEQ_T0_MS          100U    /* 0° 起点展示时间 */
-#define MOTOR_SEQ_T1_MS          700U    /* 0°->90° 用时 */
+/* 任务五验收时序（状态机：回零 -> 两秒测试 -> 结果展示 -> 循环）：
+ *   - 回零：目标 0°，实际角度进入 ±MOTOR_SETTLE_BAND_DEG 持续 MOTOR_SETTLE_HOLD_MS
+ *     后才开始测试（保证每轮都真正从 0° 出发）；
+ *   - 两秒测试：0~700ms 目标 90°，700~2000ms 目标 -90°（固定时间切换，到位检测只记录）；
+ *   - 结果展示：保持 -90° MOTOR_SHOW_MS，期间通道 7 持续显示本轮结果。 */
+#define MOTOR_TEST_T90_MS       700U    /* 测试阶段：目标 90° 的时长 */
+#define MOTOR_TEST_TOTAL_MS     2000U   /* 测试阶段总时长（2 秒） */
+#define MOTOR_SHOW_MS           300U    /* 结果展示时长 */
 
 /* 到位检测（只记录与上报，不干预控制时序） */
 #define MOTOR_SETTLE_BAND_DEG    5.0f    /* 输出轴误差进入 ±5° 视为到位 */
@@ -57,7 +57,7 @@ typedef struct
     uint8_t  feedback_ok;    /* 是否收到过反馈 */
     uint8_t  fault_timeout;  /* 反馈超时故障标志 */
     uint8_t  settled;        /* 当前是否在目标带宽内持续到位 */
-    uint8_t  test_pass;      /* 本轮 0->90->-90 是否都到位（0/1） */
+    int8_t   test_pass;      /* 本轮测试结果：0=测试中，1=通过，-1=失败 */
 } Motor_State_t;
 
 /*----------------------------- 接口 -----------------------------*/
