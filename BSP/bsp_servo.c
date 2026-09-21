@@ -11,6 +11,10 @@
 static uint16_t s_pulse_min = SERVO_PULSE_0DEG_US;
 static uint16_t s_pulse_max = SERVO_PULSE_180DEG_US;
 
+/* 手动角度测试状态（由串口指令 ang= 触发，超时自动失效） */
+static float    s_manual_deg      = 0.0f;
+static uint32_t s_manual_deadline = 0U;
+
 void BSP_Servo_Init(void)
 {
     GPIO_InitTypeDef  gpio = {0};
@@ -109,4 +113,34 @@ uint16_t BSP_Servo_GetPulseMin(void)
 uint16_t BSP_Servo_GetPulseMax(void)
 {
     return s_pulse_max;
+}
+
+void BSP_Servo_SetManual(float deg, uint32_t timeout_ms)
+{
+    if (deg < 0.0f)
+    {
+        deg = 0.0f;
+    }
+    if (deg > 180.0f)
+    {
+        deg = 180.0f;
+    }
+
+    s_manual_deg      = deg;
+    s_manual_deadline = HAL_GetTick() + timeout_ms;
+}
+
+uint8_t BSP_Servo_GetManual(float *deg)
+{
+    /* 超时判断用无符号差值，天然防回绕 */
+    if ((int32_t)(HAL_GetTick() - s_manual_deadline) >= 0)
+    {
+        return 0;       /* 未处于手动模式 */
+    }
+
+    if (deg != 0)
+    {
+        *deg = s_manual_deg;
+    }
+    return 1;
 }

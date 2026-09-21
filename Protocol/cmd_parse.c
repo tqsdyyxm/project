@@ -158,6 +158,13 @@ static void parse_line(const char *line, uint32_t len)
         JustFloat_SetEcho((float)BSP_Servo_GetPulseMax());   /* 回显实际生效值 */
         return;
     }
+    else if (name_equal(name_buf, name_len, "ang"))
+    {
+        /* 舵机手动角度（0~180°），10 秒后自动恢复扫描，用于校准/诊断 */
+        BSP_Servo_SetManual(value, 10000U);
+        JustFloat_SetEcho(value);
+        return;
+    }
     else
     {
         s_error_cnt++;      /* 未识别的参数名 */

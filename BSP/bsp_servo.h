@@ -36,6 +36,11 @@ void BSP_Servo_SetPulseRange(uint16_t min_us, uint16_t max_us);
 uint16_t BSP_Servo_GetPulseMin(void);
 uint16_t BSP_Servo_GetPulseMax(void);
 
+/* 手动角度测试（校准/诊断用）：设置后舵机任务在 timeout_ms 内只输出该角度，
+ * 超时自动恢复自动扫描，避免影响正常演示。 */
+void    BSP_Servo_SetManual(float deg, uint32_t timeout_ms);
+uint8_t BSP_Servo_GetManual(float *deg);   /* 返回 1 = 手动模式生效 */
+
 #ifdef __cplusplus
 }
 #endif

@@ -28,6 +28,15 @@ void Task_Servo_Entry(void *argument)
     {
         uint32_t pos = osKernelGetTickCount() % CYCLE_TIME_MS;
         float    angle;
+        float    manual_deg;
+
+        /* 手动角度模式（串口 ang= 触发，10 秒后自动恢复扫描） */
+        if (BSP_Servo_GetManual(&manual_deg))
+        {
+            BSP_Servo_SetAngle(manual_deg);
+            osDelay(20U);
+            continue;
+        }
 
         if (pos < TRAVEL_TIME_MS)
         {
