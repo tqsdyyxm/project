@@ -9,6 +9,12 @@
 
 #define PID_DT   0.001f    /* 固定控制周期 1 ms（调用频率 1 kHz） */
 
+/* 比例/微分项的单独限幅系数（相对总输出限幅）。
+ * 必须 > 1：否则运动过程中"比例项 +4A、微分项 -4A"直接相抵为 0，
+ * 总输出被夹在 0 附近，电机失去制动能力 -> 严重超调。
+ * 取 5 倍后，两项相抵仍能剩下净刹车电流（总输出仍严格限制在 out_max）。 */
+#define PID_TERM_LIMIT_FACTOR   5.0f
+
 static float clamp_sym(float v, float limit)
 {
     if (v > limit)
@@ -29,8 +35,8 @@ void Pid_Init(Pid_t *p, float kp, float ki, float kd, float out_max, float i_max
     p->kd = kd;
     p->out_max = out_max;
     p->i_max   = i_max;
-    p->p_max   = out_max;   /* 各项默认与总输出同限幅 */
-    p->d_max   = out_max;
+    p->p_max   = out_max * PID_TERM_LIMIT_FACTOR;   /* 各项限幅放宽（见宏注释） */
+    p->d_max   = out_max * PID_TERM_LIMIT_FACTOR;
 
     p->err   = 0.0f;
     p->i_out = 0.0f;
