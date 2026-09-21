@@ -10,6 +10,7 @@
 
 #include "cmd_parse.h"
 #include "bsp_uart.h"
+#include "bsp_servo.h"
 #include "justfloat.h"
 #include "motor.h"
 #include <string.h>
@@ -142,6 +143,20 @@ static void parse_line(const char *line, uint32_t len)
     {
         if (value > PARAM_KD_MAX) { value = PARAM_KD_MAX; }
         kd = value;
+    }
+    else if (name_equal(name_buf, name_len, "smin"))
+    {
+        /* 舵机 0° 对应脉宽在线校准（µs） */
+        BSP_Servo_SetPulseRange((uint16_t)value, BSP_Servo_GetPulseMax());
+        JustFloat_SetEcho((float)BSP_Servo_GetPulseMin());   /* 回显实际生效值 */
+        return;
+    }
+    else if (name_equal(name_buf, name_len, "smax"))
+    {
+        /* 舵机 180° 对应脉宽在线校准（µs） */
+        BSP_Servo_SetPulseRange(BSP_Servo_GetPulseMin(), (uint16_t)value);
+        JustFloat_SetEcho((float)BSP_Servo_GetPulseMax());   /* 回显实际生效值 */
+        return;
     }
     else
     {

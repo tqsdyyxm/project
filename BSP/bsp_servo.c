@@ -7,6 +7,10 @@
 
 #include "bsp_servo.h"
 
+/* 当前生效的脉宽范围（默认取头文件宏，可被串口指令 smin/smax 在线修改） */
+static uint16_t s_pulse_min = SERVO_PULSE_0DEG_US;
+static uint16_t s_pulse_max = SERVO_PULSE_180DEG_US;
+
 void BSP_Servo_Init(void)
 {
     GPIO_InitTypeDef  gpio = {0};
@@ -65,10 +69,44 @@ void BSP_Servo_SetAngle(float deg)
         deg = 180.0f;
     }
 
-    /* 线性换算：0° -> 500us，180° -> 2500us；计数频率 1 MHz，1 计数值 = 1 us */
-    pulse_us = (float)SERVO_PULSE_0DEG_US +
-               deg * (float)(SERVO_PULSE_180DEG_US - SERVO_PULSE_0DEG_US) / 180.0f;
+    /* 线性换算：0° -> min_us，180° -> max_us；计数频率 1 MHz，1 计数值 = 1 us */
+    pulse_us = (float)s_pulse_min +
+               deg * (float)(s_pulse_max - s_pulse_min) / 180.0f;
     ccr = (uint32_t)(pulse_us + 0.5f);
 
     __HAL_TIM_SET_COMPARE(&htim_servo, TIM_CHANNEL_1, ccr);
+}
+
+/**
+  * @brief  在线校准脉宽范围（用于适配不同舵机的实际端点）
+  * @param  min_us 0° 对应脉宽（µs），max_us 180° 对应脉宽（µs）
+  * @note   仅做合法性检查后更新静态变量，下一次 SetAngle 立即生效
+  */
+void BSP_Servo_SetPulseRange(uint16_t min_us, uint16_t max_us)
+{
+    if (min_us < SERVO_PULSE_MIN_US)
+    {
+        min_us = SERVO_PULSE_MIN_US;
+    }
+    if (max_us > SERVO_PULSE_MAX_US)
+    {
+        max_us = SERVO_PULSE_MAX_US;
+    }
+    if (max_us < (uint16_t)(min_us + 200U))
+    {
+        return;             /* 非法组合（量程太小）：忽略本次设置 */
+    }
+
+    s_pulse_min = min_us;
+    s_pulse_max = max_us;
+}
+
+uint16_t BSP_Servo_GetPulseMin(void)
+{
+    return s_pulse_min;
+}
+
+uint16_t BSP_Servo_GetPulseMax(void)
+{
+    return s_pulse_max;
 }
