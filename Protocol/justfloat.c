@@ -9,7 +9,7 @@
 #include "bsp_uart.h"
 #include <string.h>
 
-#define JF_MAX_CHANNELS 8U
+#define JF_MAX_CHANNELS 12U
 
 static float s_echo = 0.0f;
 

@@ -26,11 +26,11 @@ void Task_Synex_Entry(void *argument)
         /* 1) 解析串口指令（kp= / ki= / kd=） */
         Protocol_CmdParse_Poll();
 
-        /* 2) 每 20ms 发一帧 JustFloat 数据（50 Hz，固定 7 通道布局） */
+        /* 2) 每 20ms 发一帧 JustFloat 数据（50 Hz，固定 9 通道布局） */
         if ((tick % SEND_INTERVAL_TICKS) == 0U)
         {
             const Motor_State_t *m = Control_Motor_GetState();
-            float channels[7];
+            float channels[9];
 
             channels[0] = m->current_a;      /* 通道1：电流 A */
             channels[1] = m->rotor_deg;      /* 通道2：转子机械角(单圈 0~360) ° */
@@ -38,9 +38,11 @@ void Task_Synex_Entry(void *argument)
             channels[3] = m->out_deg;        /* 通道4：输出轴角度 ° */
             channels[4] = m->target_deg;     /* 通道5：目标角度 ° */
             channels[5] = JustFloat_GetEcho(); /* 通道6：参数回显 */
-            channels[6] = (float)m->test_pass; /* 通道7：测试结果 0=测试中 1=通过 -1=失败 */
+            channels[6] = (float)m->test_pass;   /* 通道7：测试结果 */
+            channels[7] = (float)m->t90_ms;      /* 通道8：到达 +90° 耗时(ms) */
+            channels[8] = (float)m->tneg90_ms;   /* 通道9：到达 -90° 耗时(ms) */
 
-            JustFloat_SendFrame(channels, 7U);
+            JustFloat_SendFrame(channels, 9U);
         }
 
         /* 3) 解析失败 -> 报错音 1 */

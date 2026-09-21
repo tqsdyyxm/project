@@ -39,6 +39,8 @@ static float    s_settle_target = 0.0f;   /* 到位检测：当前跟踪的目�
 static uint32_t s_settle_ms     = 0;      /* 连续在带宽内的时长（ms） */
 static uint8_t  s_reached_90    = 0;
 static uint8_t  s_reached_neg90 = 0;
+static uint32_t s_phase_start   = 0;      /* 本段目标起点（tick，用于统计到位耗时） */
+static uint8_t  s_phase_done    = 0;      /* 本段到位耗时是否已记录 */
 
 static Seq_State_t s_seq_state  = SEQ_STATE_ZEROING;
 static uint32_t    s_seq_start  = 0;      /* 本轮测试起点（tick） */
@@ -60,6 +62,8 @@ void Control_Motor_Init(void)
     s_motor.fault_timeout = 0;
     s_motor.settled       = 0;
     s_motor.test_pass     = 0;
+    s_motor.t90_ms        = 0;
+    s_motor.tneg90_ms     = 0;
 
     s_total_counts = 0;
     s_last_counts  = 0;
@@ -70,6 +74,8 @@ void Control_Motor_Init(void)
     s_settle_ms     = 0;
     s_reached_90    = 0;
     s_reached_neg90 = 0;
+    s_phase_start   = 0;
+    s_phase_done    = 0;
     s_seq_state     = SEQ_STATE_ZEROING;
     s_seq_start     = 0;
     s_show_start    = 0;
@@ -177,6 +183,8 @@ void Control_Motor_Task1ms(void)
         {
             s_settle_target = s_target;
             s_settle_ms     = 0;
+            s_phase_start   = now;      /* 记录本段起点，用于统计到位耗时 */
+            s_phase_done    = 0;
         }
 
         if (fabsf(s_motor.out_deg - s_target) <= MOTOR_SETTLE_BAND_DEG)
@@ -191,8 +199,14 @@ void Control_Motor_Task1ms(void)
         if (s_settle_ms >= MOTOR_SETTLE_HOLD_MS)
         {
             s_motor.settled = 1;
-            if (s_target == 90.0f)  { s_reached_90 = 1; }
-            if (s_target == -90.0f) { s_reached_neg90 = 1; }
+            if (!s_phase_done)
+            {
+                /* 记录本段到位耗时（扣除 50ms 确认窗口），供 PID 调参量化参考 */
+                uint16_t cost = (uint16_t)((now - s_phase_start) - MOTOR_SETTLE_HOLD_MS);
+                s_phase_done = 1;
+                if (s_target == 90.0f)  { s_reached_90 = 1;    s_motor.t90_ms    = cost; }
+                if (s_target == -90.0f) { s_reached_neg90 = 1; s_motor.tneg90_ms = cost; }
+            }
         }
         else
         {
@@ -216,9 +230,11 @@ void Control_Motor_Task1ms(void)
                 s_settle_target == 0.0f)
             {
                 /* 已稳定在 0°：开始本轮测试，并清除上一轮结果 */
-                s_reached_90      = 0;
-                s_reached_neg90   = 0;
-                s_motor.test_pass = 0;
+                s_reached_90        = 0;
+                s_reached_neg90     = 0;
+                s_motor.test_pass   = 0;
+                s_motor.t90_ms      = 0;
+                s_motor.tneg90_ms   = 0;
                 s_seq_start = now;
                 s_seq_state = SEQ_STATE_TESTING;
             }
